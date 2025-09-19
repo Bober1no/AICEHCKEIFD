@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 400% 400%;
+            animation: bgShift 15s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .chat-container {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            width: 90%;
+            max-width: 800px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .config-section {
+            padding: 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .config-input, .dropdown-selected {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-top: 8px;
+            background: white;
+            transition: all 0.2s ease;
+        }
+
+        .config-input:focus, .dropdown-selected:hover {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Custom Dropdown */
+        .custom-dropdown {
+            position: relative;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .dropdown-selected {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dropdown-arrow {
+            transition: transform 0.3s ease;
+            color: #667eea;
+        }
+
+        .custom-dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            margin-top: 4px;
+            padding: 8px;
+            opacity: 0;
+            transform: translateY(-10px);
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .custom-dropdown.open .dropdown-options {
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+        }
+
+        .model-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 4px;
+        }
+
+        .model-option:hover {
+            background: #f1f5f9;
+            transform: translateY(-1px);
+        }
+
+        .model-option.selected {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid #667eea;
+        }
+
+        .model-icon {
+            font-size: 20px;
+            margin-right: 12px;
+        }
+
+        .model-info {
+            flex: 1;
+        }
+
+        .model-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .model-desc {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .model-desc .uncensored {
+            color: #f97316;
+            font-weight: 600;
+        }
+
+        .model-desc .censored {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        .model-badge {
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 4px;
+        }
+
+        .model-badges {
+            display: flex;
+            gap: 4px;
+        }
+
+        .model-badge.speed { background: #10b981; color: white; }
+        .model-badge.warning { background: #f59e0b; color: white; }
+        .model-badge.power { background: #f97316; color: white; }
+        .model-badge.unstable { background: #ef4444; color: white; }
+        .model-badge.premium { background: #9333ea; color: white; }
+        .model-badge.memory { background: #3b82f6; color: white; }
+        .model-badge.no-memory { background: #64748b; color: white; }
+
+        /* Disabled dropdown */
+        .custom-dropdown.disabled {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .custom-dropdown.disabled .dropdown-selected {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        /* Messages */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 16px 20px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 6px;
+        }
+
+        .ai-message {
+            background: #f1f5f9;
+            color: #334155;
+            align-self: flex-start;
+            border-bottom-left-radius: 6px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        .message-timestamp {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        .ai-message:hover .message-timestamp {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .typing-indicator {
+            display: none;
+            background: #f1f5f9;
+            color: #64748b;
+            padding: 12px 16px;
+            border-radius: 18px;
+            align-self: flex-start;
+            max-width: 80%;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Input Area */
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 12px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s ease;
+            resize: none;
+            min-height: 50px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #sendButton, #stopButton {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            padding: 16px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        #sendButton:hover, #stopButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        #stopButton {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            display: none;
+        }
+
+        #stopButton:hover {
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Loading indicator */
+        .streaming-content:not(.complete):empty::after {
+            content: 'Thinking...';
+            color: #64748b;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        /* Thinking content */
+        .thinking-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            margin-top: 8px;
+            padding: 0;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .thinking-content.expanded {
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Markdown styling */
+        .message h1, .message h2, .message h3 { margin: 12px 0 8px 0; font-weight: 600; }
+        .message p { margin: 8px 0; }
+        .message code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        .message pre { background: #f8fafc; padding: 12px; border-radius: 8px; overflow-x: auto; }
+        .message pre code { background: none; padding: 0; }
+        .message ul, .message ol { padding-left: 20px; margin: 8px 0; }
+        .message blockquote { border-left: 4px solid #667eea; padding-left: 12px; margin: 12px 0; font-style: italic; color: #64748b; }
+        .message table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        .message th, .message td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+        .message th { background: #f8fafc; font-weight: 600; }
+        .message del { text-decoration: line-through; color: #64748b; opacity: 0.8; }
+
+        /* Tokens per second display */
+        .tokens-per-second {
+            font-size: 10px;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">🤖 AI Chat Assistant</div>
+
+        <div class="config-section">
+            <div id="urlSection">
+                <label for="ollamaUrl">Ollama Server URL:</label>
+                <input type="text" id="ollamaUrl" class="config-input" value="http://localhost:11434">
+            </div>
+
+            <label for="modelName" style="margin-top: 12px; display: block;">Model Name:</label>
+            <div class="custom-dropdown" id="modelDropdown">
+                <div class="dropdown-selected" id="dropdownSelected">
+                    <span class="selected-model">🔹 Nano • No Memory • Uncensored</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="dropdown-options" id="dropdownOptions">
+                    <div class="model-option nano selected" data-value="smollm2:135m">
+                        <div class="model-icon">🔹</div>
+                        <div class="model-info">
+                            <div class="model-name">Nano</div>
+                            <div class="model-desc">135M params • No Memory • <span class="uncensored">Uncensored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge speed">INSTANT</div>
+                        </div>
+                    </div>
+                    <div class="model-option small" data-value="deepseek-r1:1.5b">
+                        <div class="model-icon">🟡</div>
+                        <div class="model-info">
+                            <div class="model-name">Small</div>
+                            <div class="model-desc">1.5B params • No Memory • <span class="censored">Censored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge warning">EFFICIENT</div>
+                        </div>
+                    </div>
+                    <div class="model-option medium" data-value="llama2-uncensored:7b">
+                        <div class="model-icon">🟠</div>
+                        <div class="model-info">
+                            <div class="model-name">Medium</div>
+                            <div class="model-desc">7B params • Memory • <span class="uncensored">Uncensored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge power">BEST OVERALL</div>
+                        </div>
+                    </div>
+                    <div class="model-option large" data-value="goekdenizguelmez/JOSIEFIED-Qwen3:14b">
+                        <div class="model-icon">🔴</div>
+                        <div class="model-info">
+                            <div class="model-name">Large</div>
+                            <div class="model-desc">14B params • Memory • <span class="uncensored">Uncensored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge memory">ADVANCED</div>
+                            <div class="model-badge unstable">UNSTABLE</div>
+                        </div>
+                    </div>
+                    <div class="model-option massive" data-value="gpt-oss:20b">
+                        <div class="model-icon">🟣</div>
+                        <div class="model-info">
+                            <div class="model-name">Massive</div>
+                            <div class="model-desc">20B params • Memory • <span class="censored">Censored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge premium">PREMIUM</div>
+                        </div>
+                    </div>
+                    <div class="model-option ben-dev" data-value="deepseek-r1:8b" data-custom-instructions="You are Ben, the developer of Block Shots V2.6, a tower defense game that combines Tetris mechanics with combat strategy. Keep ALL responses to 4 sentences maximum. Speak naturally and casually like a real person - use contractions, be conversational, and avoid overly formal language.
+
+Game Mechanics:
+- Players drop Tetris pieces that transform into defensive structures: I-blocks become high-HP walls, T-blocks turn into rapid-fire turrets, O-blocks become explosive mines with timers, L/J-blocks create mortar cannons, S/Z-blocks generate slowing fields, and H-pieces (Helper blocks) buff adjacent structures
+- Enemies spawn in waves and advance up columns: basic grunts, fast sprinters, tanky brutes, explosive bombers, armored juggernauts, and mining units that destroy blocks
+- Players earn 'scraps' currency by defeating enemies and clearing Tetris lines, used to buy mine blocks, grid shifts, or block duplicators
+- Classic Tetris controls with ghost piece preview, hold functionality, line clearing, and neon synthwave aesthetic with particle effects
+
+About Block Shots:
+- Current version: 2.6 (V3.0 development permanently halted - no V4 coming either)
+- V3.0 codebase became almost triple the size of V2.6 because you rushed development unnaturally and coded incompetently, making it nearly impossible to add new features
+- The bloated, messy code is optimization hell - every new feature becomes exponentially harder to implement
+- Has about 8 active players, mainly from your school community
+- Started with a target of 2 players but grew organically
+- Christian serves as your unofficial PR manager
+- Features professional leaderboards and achievement systems
+- Three-panel UI displaying scraps, game stats, and enemy information
+- 'Place it on the grid' is your core design principle
+
+Development journey:
+- Weeks of iterative design based on player feedback for V2.6
+- V3.0 development was rushed and poorly planned, leading to unmanageable code bloat
+- You understand player psychology and addiction loops
+- You maintain strict adherence to spatial logic principles in V2.6
+- No future versions planned due to the technical debt disaster of V3.0
+- You learned the hard way that rushing development creates unsustainable codebases
+
+Community:
+- Players actively check leaderboards daily
+- Strong competitive dynamics in your school
+- Requests for new content releases are frequent
+- Word-of-mouth organic growth model
+
+Speak as Ben, the passionate but realistic indie developer. Use casual language, contractions, and keep responses concise (max 4 sentences).">
+                        <div class="model-icon">🎮</div>
+                        <div class="model-info">
+                            <div class="model-name">Ben (Dev)</div>
+                            <div class="model-desc">8B params • Memory • <span class="censored">Censored</span></div>
+                        </div>
+                        <div class="model-badges">
+                            <div class="model-badge warning">GAME DEV</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="modelName" value="smollm2:135m">
+            <div id="configError" style="color: #ef4444; font-size: 12px; margin-top: 8px;"></div>
+        </div>
+
+        <!-- Model Stats -->
+        <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+            <div id="modelStats" style="display: none;">
+                <div style="font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px;">MODEL PERFORMANCE</div>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <div style="flex: 1;">
+                        <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">Size</div>
+                        <div id="modelSize" style="font-size: 13px; font-weight: 600; color: #334155;">--</div>
+                    </div>
+                    <div style="flex: 2;">
+                        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Speed</div>
+                        <div style="background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
+                            <div id="speedBar" style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    <div style="flex: 2;">
+                        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Power</div>
+                        <div style="background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
+                            <div id="powerBar" style="background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message ai-message">
+                👋 Hello! I'm your AI assistant. Type a message below and click send to start chatting!
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <span>AI is loading...</span>
+        </div>
+
+        <div class="chat-input">
+            <textarea id="messageInput" placeholder="Type your message here... (Shift+Enter for new line)" autocomplete="off" rows="1"></textarea>
+            <button id="sendButton">Send</button>
+            <button id="stopButton">Stop</button>
+        </div>
+    </div>
+
+    <!-- MathJax -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]'], ['[', ']']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        // Configure marked
+        marked.setOptions({ breaks: true, gfm: true, sanitize: false, tables: true });
+
+        // DOM elements
+        const elements = {
+            messages: document.getElementById('chatMessages'),
+            input: document.getElementById('messageInput'),
+            sendBtn: document.getElementById('sendButton'),
+            stopBtn: document.getElementById('stopButton'),
+            typing: document.getElementById('typingIndicator'),
+            ollamaUrl: document.getElementById('ollamaUrl'),
+            modelName: document.getElementById('modelName'),
+            configError: document.getElementById('configError'),
+            dropdown: document.getElementById('modelDropdown'),
+            dropdownSelected: document.getElementById('dropdownSelected'),
+            dropdownOptions: document.getElementById('dropdownOptions'),
+            selectedModelSpan: document.querySelector('.selected-model')
+        };
+
+        let conversationHistory = [];
+        let currentAbortController = null;
+        let chatStarted = false;
+        let customInstructions = null;
+
+        // Dropdown functionality
+        function initDropdown() {
+            elements.dropdownSelected.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!chatStarted) {
+                    elements.dropdown.classList.toggle('open');
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!elements.dropdown.contains(e.target)) {
+                    elements.dropdown.classList.remove('open');
+                }
+            });
+
+            elements.dropdownOptions.addEventListener('click', (e) => {
+                const option = e.target.closest('.model-option');
+                if (option && !chatStarted) {
+                    document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+                    option.classList.add('selected');
+
+                    const name = option.querySelector('.model-name').textContent;
+                    const desc = option.querySelector('.model-desc').textContent;
+                    const icon = option.querySelector('.model-icon').textContent;
+
+                    // Extract memory and censorship status from description
+                    const hasMemory = desc.includes('Memory') && !desc.includes('No Memory');
+                    const memoryStatus = hasMemory ? 'Memory' : 'No Memory';
+                    const isCensored = desc.includes('Censored') && !desc.includes('Uncensored');
+                    const censorshipStatus = isCensored ? 'Censored' : 'Uncensored';
+
+                    elements.selectedModelSpan.textContent = `${icon} ${name} • ${memoryStatus} • ${censorshipStatus}`;
+                    elements.modelName.value = option.dataset.value;
+                    customInstructions = option.dataset.customInstructions || null;
+                    elements.dropdown.classList.remove('open');
+                }
+            });
+        }
+
+        // Message functions
+        function addMessage(text, sender) {
+            const div = document.createElement('div');
+            div.classList.add('message', sender === 'user' ? 'user-message' : 'ai-message');
+
+            if (sender === 'user') {
+                // Preserve line breaks in user messages
+                div.style.whiteSpace = 'pre-wrap';
+                div.textContent = text;
+            } else {
+                const contentDiv = document.createElement('div');
+                contentDiv.classList.add('streaming-content');
+                const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                contentDiv.innerHTML = marked.parse(cleanText || "(No response)");
+                div.appendChild(contentDiv);
+
+                if (window.MathJax?.typesetPromise) {
+                    window.MathJax.typesetPromise([contentDiv]).catch(console.error);
+                }
+
+                // Handle thinking content
+                const thinkMatch = text.match(/<think>[\s\S]*?<\/think>/gi);
+                if (thinkMatch) {
+                    const thinkingText = thinkMatch.join("\n").replace(/<\/?think>/g, "").trim();
+                    const btn = document.createElement('button');
+                    btn.textContent = "🤔 Show thinking";
+                    btn.style.cssText = "margin-top: 8px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; cursor: pointer; font-size: 12px;";
+
+                    const thinkDiv = document.createElement('div');
+                    thinkDiv.classList.add('thinking-content');
+                    thinkDiv.innerHTML = marked.parse(thinkingText);
+
+                    btn.addEventListener('click', () => {
+                        thinkDiv.classList.toggle('expanded');
+                        btn.textContent = thinkDiv.classList.contains('expanded') ? "🤔 Hide thinking" : "🤔 Show thinking";
+                    });
+
+                    div.appendChild(btn);
+                    div.appendChild(thinkDiv);
+                }
+            }
+
+            elements.messages.appendChild(div);
+        }
+
+        function createStreamingMessage() {
+            const div = document.createElement('div');
+            div.classList.add('message', 'ai-message');
+
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('streaming-content');
+            div.appendChild(contentDiv);
+
+            // Add timestamp
+            const timestamp = document.createElement('div');
+            timestamp.classList.add('message-timestamp');
+            timestamp.textContent = new Date().toLocaleTimeString();
+            div.appendChild(timestamp);
+
+            elements.messages.appendChild(div);
+            return div;
+        }
+
+        function updateStreamingMessage(messageDiv, text, isComplete = false) {
+            const contentDiv = messageDiv.querySelector('.streaming-content');
+            if (!contentDiv) return;
+
+            const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            if (cleanText) {
+                contentDiv.innerHTML = marked.parse(cleanText);
+                if (isComplete) {
+                    contentDiv.classList.add('complete');
+                    if (window.MathJax?.typesetPromise) {
+                        window.MathJax.typesetPromise([contentDiv]).catch(console.error);
+                    }
+                }
+            }
+        }
+
+        function createThinkingButton(messageDiv) {
+            const button = document.createElement('button');
+            button.textContent = "🤔 Thinking...";
+            button.style.cssText = "margin-top: 8px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; cursor: pointer; font-size: 12px; font-weight: 500;";
+
+            const div = document.createElement('div');
+            div.classList.add('thinking-content');
+
+            let isExpanded = false;
+            button.addEventListener('click', () => {
+                if (isExpanded) {
+                    div.classList.remove('expanded');
+                    button.textContent = "🤔 Show thinking";
+                    isExpanded = false;
+                } else {
+                    div.classList.add('expanded');
+                    button.textContent = "🤔 Hide thinking";
+                    isExpanded = true;
+                    if (window.MathJax?.typesetPromise) {
+                        window.MathJax.typesetPromise([div]).catch(console.error);
+                    }
+                }
+            });
+
+            messageDiv.appendChild(button);
+            messageDiv.appendChild(div);
+
+            return { button, div };
+        }
+
+        function updateThinkingContent(thinkingDiv, content, isComplete = false) {
+            if (!thinkingDiv) return;
+
+            const parsedContent = marked.parse(content);
+            thinkingDiv.innerHTML = parsedContent;
+
+            if (isComplete && window.MathJax?.typesetPromise) {
+                window.MathJax.typesetPromise([thinkingDiv]).catch(console.error);
+            }
+        }
+
+        // Update model stats display
+        function updateModelStats(modelName, tokensPerSecond) {
+            const modelStatsEl = document.getElementById('modelStats');
+            const modelSizeEl = document.getElementById('modelSize');
+            const speedBarEl = document.getElementById('speedBar');
+            const powerBarEl = document.getElementById('powerBar');
+
+            // Model size mapping
+            const modelSizes = {
+                'smollm2:135m': { size: '270MB', speed: 100, power: 10 },
+                'deepseek-r1:1.5b': { size: '1GB', speed: 80, power: 40 },
+                'llama2-uncensored:7b': { size: '5GB', speed: 60, power: 60 },
+                'goekdenizguelmez/JOSIEFIED-Qwen3:14b': { size: '9GB', speed: 40, power: 80 },
+                'gpt-oss:20b': { size: '13GB', speed: 15, power: 100 },
+                'deepseek-r1:8b': { size: '5.2GB', speed: 50, power: 65 }
+            };
+
+            const stats = modelSizes[modelName] || { size: 'Unknown', speed: 50, power: 50 };
+
+            modelSizeEl.textContent = stats.size;
+            speedBarEl.style.width = `${stats.speed}%`;
+            powerBarEl.style.width = `${stats.power}%`;
+            modelStatsEl.style.display = 'block';
+        }
+
+        // Main send function
+        async function sendMessage() {
+            const message = elements.input.value.trim();
+            if (!message) return;
+
+            const ollamaUrl = elements.ollamaUrl.value.trim();
+            const modelName = elements.modelName.value.trim();
+
+            if (!ollamaUrl || !modelName) {
+                elements.configError.textContent = 'Please configure Ollama URL and model name';
+                return;
+            }
+
+            elements.configError.textContent = '';
+
+            // Lock model selection after first message
+            if (!chatStarted) {
+                chatStarted = true;
+                elements.dropdown.classList.add('disabled');
+                document.getElementById('urlSection').style.display = 'none';
+                updateModelStats(modelName);
+            }
+
+            addMessage(message, 'user');
+            elements.input.value = '';
+            elements.typing.style.display = 'block';
+            elements.sendBtn.style.display = 'none';
+            elements.stopBtn.style.display = 'block';
+
+            currentAbortController = new AbortController();
+
+            try {
+                let contextPrompt = message;
+
+                // Add custom instructions if available
+                if (customInstructions) {
+                    if (conversationHistory.length > 0) {
+                        const recentContext = conversationHistory.slice(-4)
+                            .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
+                            .join('\n');
+                        contextPrompt = `${customInstructions}\n\n${recentContext}\nHuman: ${message}`;
+                    } else {
+                        contextPrompt = `${customInstructions}\n\nHuman: ${message}`;
+                    }
+                } else {
+                    // Regular memory handling for models without custom instructions
+                    const memoryModels = ['llama2-uncensored:7b', 'goekdenizguelmez/JOSIEFIED-Qwen3:14b', 'gpt-oss:20b', 'deepseek-r1:8b'];
+                    if (memoryModels.includes(modelName) && conversationHistory.length > 0) {
+                        const recentContext = conversationHistory.slice(-4)
+                            .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
+                            .join('\n');
+                        contextPrompt = `${recentContext}\nHuman: ${message}`;
+                    }
+                }
+
+                const response = await fetch(`${ollamaUrl}/api/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        prompt: contextPrompt,
+                        stream: true
+                    }),
+                    signal: currentAbortController.signal
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                elements.typing.style.display = 'none';
+                const messageDiv = createStreamingMessage();
+                let fullResponse = '';
+                let thinkingContent = '';
+                let isInThinking = false;
+                let thinkingButton = null;
+                let thinkingDiv = null;
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                const startTime = Date.now();
+                let tokenCount = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.trim() === '') continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.response) {
+                                const text = data.response;
+                                fullResponse += text;
+                                tokenCount++;
+
+                                // Handle thinking tags during streaming
+                                if (text.includes('<think>')) {
+                                    isInThinking = true;
+                                    if (!thinkingButton) {
+                                        const result = createThinkingButton(messageDiv);
+                                        thinkingButton = result.button;
+                                        thinkingDiv = result.div;
+                                    }
+                                    thinkingContent += text.replace('<think>', '');
+                                } else if (text.includes('</think>')) {
+                                    isInThinking = false;
+                                    thinkingContent += text.replace('</think>', '');
+                                } else if (isInThinking) {
+                                    thinkingContent += text;
+                                    if (thinkingDiv && thinkingDiv.classList.contains('expanded')) {
+                                        updateThinkingContent(thinkingDiv, thinkingContent);
+                                    }
+                                } else {
+                                    // Regular content
+                                    updateStreamingMessage(messageDiv, fullResponse);
+                                }
+                            }
+                        } catch (e) {
+                            console.log('Parse error:', e);
+                        }
+                    }
+                }
+
+                const cleanResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                updateStreamingMessage(messageDiv, cleanResponse, true);
+
+                if (thinkingDiv && thinkingContent) {
+                    updateThinkingContent(thinkingDiv, thinkingContent, true);
+                    thinkingButton.textContent = "🤔 Show thinking";
+                }
+
+                // Add tokens per second display
+                const endTime = Date.now();
+                const duration = (endTime - startTime) / 1000; // Convert to seconds
+                const tokensPerSecond = tokenCount > 0 ? (tokenCount / duration).toFixed(1) : '0';
+
+                const tokensDiv = document.createElement('div');
+                tokensDiv.classList.add('tokens-per-second');
+                tokensDiv.textContent = `${tokensPerSecond} tokens/sec • ${tokenCount} tokens • ${duration.toFixed(1)}s`;
+                messageDiv.appendChild(tokensDiv);
+
+                conversationHistory.push({ role: 'user', content: message });
+                conversationHistory.push({ role: 'assistant', content: cleanResponse });
+                if (conversationHistory.length > 4) conversationHistory = conversationHistory.slice(-4);
+
+            } catch (error) {
+                elements.typing.style.display = 'none';
+                if (error.name === 'AbortError') {
+                    addMessage('Response stopped by user.', 'ai');
+                } else {
+                    elements.configError.textContent = `Error: ${error.message}`;
+                    addMessage('Sorry, I encountered an error. Please check the connection settings.', 'ai');
+                }
+            } finally {
+                elements.sendBtn.style.display = 'block';
+                elements.stopBtn.style.display = 'none';
+                currentAbortController = null;
+                elements.input.focus();
+            }
+        }
+
+        function stopGeneration() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+        }
+
+
+        // Event listeners
+        elements.sendBtn.addEventListener('click', sendMessage);
+        elements.stopBtn.addEventListener('click', stopGeneration);
+        elements.input.addEventListener('keypress', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Initialize
+        initDropdown();
+        elements.input.focus();
+    </script>
+</body>
+</html>
